@@ -263,10 +263,26 @@ class OnboardingManager {
             return;
           }
           for (const ent of entries) {
-            if (ent.isFile && window.AXFileSystem.isAudioFile(ent.name)) {
-              const file = await new Promise(res => ent.file(res));
-              file.webkitRelativePath = path + ent.name;
-              files.push(file);
+            if (ent.isFile) {
+              // More permissive check - allow if looks like audio or has size
+              const isAudio = window.AXFileSystem.isAudioFile(ent.name) || ent.name.toLowerCase().match(/\.(wav|mp3|aiff|aif|m4a|ogg|flac|wma|aac|mp2|opus)$/);
+              if (isAudio) {
+                const file = await new Promise(res => ent.file(res));
+                file.webkitRelativePath = path + ent.name;
+                files.push(file);
+              } else {
+                // Try to get file and check mime
+                try {
+                  const file = await new Promise(res => ent.file(res));
+                  if (file.type.startsWith('audio/') || file.size > 1000) {
+                    // If mime is audio or reasonably sized, include if name looks like SFX
+                    if (file.name && file.name.length > 2) {
+                      file.webkitRelativePath = path + ent.name;
+                      files.push(file);
+                    }
+                  }
+                } catch(e) {}
+              }
             } else if (ent.isDirectory) {
               const sub = await this.getFilesFromEntry(ent, path + ent.name + '/');
               files.push(...sub);
@@ -314,7 +330,6 @@ class OnboardingManager {
     if (!progressBar || !scanText) return;
     
     try {
-      // Simulate scanning progress
       let progress = 0;
       const interval = setInterval(() => {
         progress += Math.random() * 15;
@@ -323,25 +338,27 @@ class OnboardingManager {
         scanText.textContent = `Scanning... ${Math.floor(progress)}%`;
       }, 100);
       
-      // Actual scan
       const folders = window.AXStorage.getFolders();
+      console.log('[Onboarding] Scanning folders', folders);
       const files = await window.AXFileSystem.scanFolders(folders);
       
       clearInterval(interval);
       progressBar.style.width = '100%';
       scanText.textContent = `Found ${files.length} sounds • Ready!`;
       
-      // Store files globally for main app
       window.AXScannedFiles = files;
       
-      // Notify main app to refresh
       if (window.AXUI) {
         window.AXUI.setFiles(files);
       }
       
+      if (files.length === 0) {
+        scanText.textContent = `No sounds found! Make sure folder has WAV/MP3 files. Found 0`;
+      }
+      
     } catch (e) {
       console.error('[Onboarding] scanning error', e);
-      scanText.textContent = `Ready! (scan completed)`;
+      scanText.textContent = `Error: ${e.message}`;
       progressBar.style.width = '100%';
     }
   }

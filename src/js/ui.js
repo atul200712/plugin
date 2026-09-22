@@ -744,15 +744,19 @@ class UIManager {
       this.hideLoading();
       
       if (folder) {
+        console.log('[UI] Folder selected', folder);
         window.AXStorage.addFolder(folder);
-        this.showToast(`Added folder: ${folder.name}`, 'success');
+        const countInfo = folder.files ? `${folder.files.length} files` : folder.path;
+        this.showToast(`Added folder: ${folder.name} (${countInfo})`, 'success');
         this.renderFolders();
-        this.refreshLibrary();
+        await this.refreshLibrary();
+      } else {
+        this.showToast('No folder selected', 'info');
       }
     } catch (e) {
       this.hideLoading();
       console.error(e);
-      this.showToast('Failed to add folder', 'error');
+      this.showToast('Failed to add folder: ' + e.message, 'error');
     }
   }
 
@@ -790,14 +794,25 @@ class UIManager {
     this.showLoading('Scanning SFX library...');
     try {
       const folders = window.AXStorage.getFolders();
+      console.log('[UI] Refreshing library, folders:', folders);
+      if (folders.length === 0) {
+        this.setFiles([]);
+        this.hideLoading();
+        return;
+      }
       const files = await window.AXFileSystem.scanFolders(folders);
+      console.log('[UI] Scan result', files.length, 'files', files.slice(0,2));
       this.setFiles(files);
       this.hideLoading();
-      this.showToast(`Found ${files.length} sounds`, 'success');
+      if (files.length === 0) {
+        this.showToast(`No audio files found. Make sure folder contains WAV/MP3 etc.`, 'error');
+      } else {
+        this.showToast(`Found ${files.length} sounds`, 'success');
+      }
     } catch (e) {
       console.error('[UI] refresh error', e);
       this.hideLoading();
-      this.showToast('Scan failed', 'error');
+      this.showToast('Scan failed: ' + e.message, 'error');
     }
   }
 
