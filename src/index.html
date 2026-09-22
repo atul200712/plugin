@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ATUL X SFX - Premium SFX Browser</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    /* Critical inline to prevent FOUC */
+    body { background: #0a0a0b; }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo">
+          <div class="logo-mark">A</div>
+          <div class="logo-type">
+            <span class="logo-name">ATUL X SFX</span>
+            <span class="logo-tag">Antigravity</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="header-center">
+        <div class="search-box" id="search-box">
+          <span class="search-icon">⌕</span>
+          <input type="text" id="search-input" placeholder="Search sounds, tags, folders..." autocomplete="off" spellcheck="false">
+          <button class="search-clear" id="search-clear">✕</button>
+        </div>
+      </div>
+      
+      <div class="header-right">
+        <button class="icon-btn" id="btn-favorites" title="Favorites">★</button>
+        <button class="icon-btn" id="btn-add-folder" title="Add Folder">＋</button>
+        <button class="icon-btn" id="btn-settings" title="Settings">⚙</button>
+      </div>
+    </header>
+
+    <!-- Main -->
+    <div class="main">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-scroll">
+          <div class="sidebar-section">
+            <div class="sidebar-title">Library</div>
+            <div class="nav-item active" data-category="all">
+              <div class="nav-item-left"><span class="nav-icon">◫</span> All Sounds</div>
+              <span class="nav-count" id="count-all">0</span>
+            </div>
+            <div class="nav-item" data-category="favorites">
+              <div class="nav-item-left"><span class="nav-icon">★</span> Favorites</div>
+              <span class="nav-count" id="count-fav">0</span>
+            </div>
+            <div class="nav-item" data-category="recent">
+              <div class="nav-item-left"><span class="nav-icon">◷</span> Recent</div>
+              <span class="nav-count" id="count-recent">0</span>
+            </div>
+          </div>
+
+          <div class="sidebar-section">
+            <div class="sidebar-title">Categories</div>
+            <div id="category-list">
+              <!-- Dynamic -->
+            </div>
+          </div>
+
+          <div class="sidebar-section">
+            <div class="sidebar-title">Folders</div>
+            <div id="folder-list">
+              <!-- Dynamic -->
+            </div>
+          </div>
+        </div>
+        
+        <div class="sidebar-footer">
+          <button class="btn btn-ghost btn-block" id="btn-manage-folders">
+            <span>📁</span> Manage Folders
+          </button>
+          <div style="margin-top:8px; font-size:10px; color:var(--text-dim); text-align:center;">
+            <span id="app-host">PPRO • v1.0.0</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Content -->
+      <section class="content">
+        <div class="content-toolbar">
+          <div class="toolbar-left">
+            <div class="toolbar-info" id="toolbar-info">0 sounds</div>
+          </div>
+          <div class="toolbar-right">
+            <select class="sort-select" id="sort-select">
+              <option value="name-asc">Name A-Z</option>
+              <option value="name-desc">Name Z-A</option>
+              <option value="category">Category</option>
+              <option value="size-desc">Largest</option>
+              <option value="recent">Recent</option>
+            </select>
+            <div class="view-toggle">
+              <button class="view-btn active" data-view="list" title="List">☰</button>
+              <button class="view-btn" data-view="grid" title="Grid">◫</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="sfx-list list-view" id="sfx-list">
+          <div class="sfx-grid" id="sfx-grid">
+            <!-- Dynamic cards -->
+          </div>
+          
+          <div class="empty-state" id="empty-state" style="display:none">
+            <div class="empty-icon">🎧</div>
+            <div class="empty-title">No sounds found</div>
+            <div class="empty-desc">Try adjusting your search or add your SFX folder to get started.</div>
+            <button class="btn btn-primary" style="margin-top:16px" id="empty-add-folder">Add SFX Folder</button>
+          </div>
+        </div>
+
+        <div class="loading-overlay" id="loading-overlay" style="display:none">
+          <div class="spinner"></div>
+          <div style="font-size:12px; color:var(--text-soft)" id="loading-text">Scanning your SFX library...</div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Player -->
+    <footer class="player" id="player" style="display:none">
+      <div class="player-left">
+        <div class="player-art" id="player-art">♪</div>
+        <div class="player-info">
+          <div class="player-name" id="player-name">No sound selected</div>
+          <div class="player-time" id="player-time">00:00 / 00:00</div>
+        </div>
+      </div>
+      
+      <div class="player-center">
+        <div class="waveform-wrap" id="waveform-wrap">
+          <canvas class="waveform-canvas" id="waveform-canvas"></canvas>
+        </div>
+        <div class="player-controls">
+          <div class="player-btns">
+            <button class="p-btn" id="p-stop" title="Stop">■</button>
+            <button class="p-btn primary" id="p-play" title="Play/Pause (Space)">▶</button>
+            <button class="p-btn" id="p-loop" title="Loop">↻</button>
+          </div>
+          <div class="volume-wrap">
+            <span style="font-size:12px; color:var(--text-dim)">🔊</span>
+            <input type="range" class="volume-slider" id="volume-slider" min="0" max="1" step="0.01" value="0.8">
+          </div>
+        </div>
+      </div>
+      
+      <div class="player-right">
+        <button class="btn btn-ghost" id="p-fav" title="Favorite">☆</button>
+        <button class="btn btn-primary" id="p-import" title="Import to Timeline (Enter)">Import ⏎</button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Toasts -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Context Menu -->
+  <div class="context-menu" id="context-menu">
+    <div class="ctx-item" data-action="play"><span>▶</span> Play / Preview</div>
+    <div class="ctx-item" data-action="import"><span>⬇</span> Import to Timeline</div>
+    <div class="ctx-item" data-action="favorite"><span>★</span> Toggle Favorite</div>
+    <div class="ctx-item" data-action="reveal"><span>📁</span> Show in Folder</div>
+    <div class="ctx-item danger" data-action="remove"><span>✕</span> Remove from List</div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/lib/CSInterface.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/fileSystem.js"></script>
+  <script src="js/audioEngine.js"></script>
+  <script src="js/hostAdapter.js"></script>
+  <script src="js/onboarding.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+{
+  "manifestVersion": 5,
+  "id": "com.atulxsfx.plugin.uxp",
+  "name": "ATUL X SFX",
+  "version": "1.0.0",
+  "description": "Premium SFX browser for After Effects & Premiere Pro - Preview and import your custom SFX library instantly",
+  "main": "src/index.html",
+  "host": [
+    {
+      "app": "AEFT",
+      "minVersion": "24.0",
+      "data": {
+        "apiVersion": 1
+      }
+    },
+    {
+      "app": "PPRO",
+      "minVersion": "24.0",
+      "data": {
+        "apiVersion": 1
+      }
+    }
+  ],
+  "entrypoints": [
+    {
+      "type": "panel",
+      "id": "atulxsfx-panel",
+      "label": {
+        "default": "ATUL X SFX"
+      },
+      "minimumSize": {
+        "width": 340,
+        "height": 560
+      },
+      "maximumSize": {
+        "width": 500,
+        "height": 2000
+      },
+      "preferredDockedSize": {
+        "width": 380,
+        "height": 680
+      },
+      "preferredFloatingSize": {
+        "width": 400,
+        "height": 700
+      },
+      "icons": [
+        {
+          "width": 23,
+          "height": 23,
+          "path": "src/assets/icons/icon-dark.png",
+          "scale": [1, 2],
+          "theme": ["darkest", "dark", "medium"]
+        },
+        {
+          "width": 23,
+          "height": 23,
+          "path": "src/assets/icons/icon-light.png",
+          "scale": [1, 2],
+          "theme": ["lightest", "light"]
+        }
+      ]
+    }
+  ],
+  "icons": [
+    {
+      "width": 48,
+      "height": 48,
+      "path": "src/assets/icons/icon-dark.png",
+      "scale": [1, 2]
+    }
+  ],
+  "requiredPermissions": {
+    "localFileSystem": "fullAccess",
+    "clipboard": "readAndWrite",
+    "launchProcess": {
+      "schemes": ["https", "file"],
+      "extensions": [".wav", ".mp3", ".aiff", ".m4a", ".ogg", ".flac", ".mp4", ".mov"]
+    },
+    "network": {
+      "domains": "all"
+    },
+    "allowCodeGenerationFromStrings": true
+  },
+  "featureFlags": {
+    "enableSWCSupport": true
+  }
+}

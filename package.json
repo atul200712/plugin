@@ -1,0 +1,16 @@
+{
+  "name": "atul-x-sfx",
+  "version": "1.0.0",
+  "description": "Premium SFX Plugin for After Effects & Premiere Pro",
+  "main": "src/index.html",
+  "scripts": {
+    "dev": "echo 'Load extension in Adobe via UXP Developer Tool or CEP'",
+    "build": "echo 'No build needed - pure HTML/CSS/JS'",
+    "package:zxp": "echo 'Use ZXP Signer to package: zxp-sign.cmd -i ./ -o ./dist/atul-x-sfx.zxp -c cert.p12 -p password -t http://timestamp.digicert.com'",
+    "package:ccx": "echo 'Zip manifest.json + src as CCX for UXP'"
+  },
+  "keywords": ["adobe", "after-effects", "premiere-pro", "sfx", "cep", "uxp", "extension"],
+  "author": "ATUL",
+  "license": "Commercial",
+  "private": true
+}
