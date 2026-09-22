@@ -1,325 +1,235 @@
 /**
- * ATUL X SFX - File System - DEBUG VERSION for 973 files issue
+ * ATUL X SFX - File System - ULTRA SIMPLE BULLETPROOF VERSION
+ * For 973 files in Arranged sfx with 18 categories
+ * No filtering - shows everything
  */
 
 class FileSystemManager {
   constructor() {
     this.isCEP = !!(window.cep || window.__adobe_cep__);
     this.isUXP = false;
-    try {
+    try { 
       if (typeof require !== 'undefined') {
-        const maybe = require('uxp');
-        if (maybe && maybe.storage) this.isUXP = true;
+        const m = require('uxp');
+        if (m && m.storage) this.isUXP = true;
       }
     } catch(e) {}
-    this.supportedExts = ['.wav', '.mp3', '.aiff', '.aif', '.m4a', '.ogg', '.flac', '.wma', '.aac', '.mp2', '.opus', '.wma', '.aifc', '.au', '.3gp', '.amr'];
     this.fs = null; this.path = null;
     if (this.isCEP) {
       try {
-        this.fs = window.cep ? window.cep.fs : null;
-        if (!this.fs && typeof window.require === 'function') { try { this.fs = window.require('fs'); } catch(e) {} }
-        if (!this.fs && typeof require === 'function') { try { this.fs = require('fs'); } catch(e) {} }
-        if (!this.fs && window.cep_node) { this.fs = window.cep_node.require('fs'); this.path = window.cep_node.require('path'); }
-        if (!this.path) { try { if (window.require) this.path = window.require('path'); else this.path = require('path'); } catch(e) {} }
-      } catch (e) { console.warn('[FS] CEP fs init failed', e); }
+        if (window.cep_node) { this.fs = window.cep_node.require('fs'); this.path = window.cep_node.require('path'); }
+        else if (window.require) { try { this.fs = window.require('fs'); this.path = window.require('path'); } catch(e) {} }
+        else if (typeof require === 'function') { try { this.fs = require('fs'); this.path = require('path'); } catch(e) {} }
+      } catch(e) {}
     }
   }
 
-  isAudioFile(fileName, fileObj = null) {
-    // In browser preview, be 100% permissive - if user selected folder, assume all files are SFX
-    // We will include everything and let user see
-    return true; // DEBUG: include all
-  }
-
-  async selectFolderCEP() {
-    return new Promise((resolve) => {
-      try {
-        if (window.__adobe_cep__) {
-          const cs = new CSInterface();
-          cs.evalScript('Folder.selectDialog("Select your SFX Folder").fsName', (result) => {
-            console.log('[FS] CEP dialog result:', result);
-            if (!result || result === 'null' || result === 'undefined' || result === '' || result.includes('EvalScript') || result.includes('error') || result.includes('Error')) {
-              console.warn('[FS] CEP dialog cancelled or error:', result);
-              resolve(null); return;
-            }
-            let clean = result.replace(/^['"]|['"]$/g, '').trim();
-            if (clean && clean !== 'null' && clean.length > 2 && !clean.includes('EvalScript')) resolve(clean);
-            else resolve(null);
-          });
-        } else resolve(null);
-      } catch (e) { console.error('[FS] selectFolderCEP error', e); resolve(null); }
-    });
-  }
-
-  async selectFolderUXP() {
-    try {
-      const uxp = require('uxp');
-      const lfs = uxp.storage.localFileSystem;
-      const folder = await lfs.getFolder();
-      if (!folder) return null;
-      const token = await lfs.createPersistentToken(folder);
-      return { path: folder.nativePath || token, name: folder.name, token: token, entry: folder };
-    } catch (e) { console.error('[FS] selectFolderUXP error', e); return null; }
-  }
-
+  // Browser: Select folder - RETURN ALL FILES, NO FILTER
   async selectFolder() {
-    if (this.isCEP) {
-      const path = await this.selectFolderCEP();
-      if (path) return { path: path, name: path.split(/[/\\]/).pop(), token: null };
-      console.log('[FS] CEP cancelled, falling back to browser');
+    // CEP
+    if (this.isCEP && window.__adobe_cep__) {
+      const path = await new Promise(res => {
+        try {
+          const cs = new CSInterface();
+          cs.evalScript('Folder.selectDialog("Select SFX Folder").fsName', r => {
+            if (!r || r.includes('null') || r.includes('EvalScript') || r.includes('error') || r.length < 3) res(null);
+            else res(r.replace(/^['"]|['"]$/g,'').trim());
+          });
+        } catch(e) { res(null); }
+      });
+      if (path) return { path, name: path.split(/[/\\]/).pop(), files: null };
     }
+    
+    // UXP
     if (this.isUXP) {
-      try { const uxpFolder = await this.selectFolderUXP(); if (uxpFolder) return uxpFolder; } catch(e) { console.warn('[FS] UXP failed', e); }
+      try {
+        const uxp = require('uxp');
+        const folder = await uxp.storage.localFileSystem.getFolder();
+        if (folder) {
+          const token = await uxp.storage.localFileSystem.createPersistentToken(folder);
+          return { path: folder.nativePath || token, name: folder.name, entry: folder, files: null };
+        }
+      } catch(e) {}
     }
-    // Browser - INCLUDE ALL FILES, NO FILTERING
+
+    // Browser - SIMPLEST POSSIBLE
     return new Promise(resolve => {
       const input = document.createElement('input');
       input.type = 'file';
       input.webkitdirectory = true;
       input.multiple = true;
-      input.setAttribute('directory', '');
-      input.setAttribute('webkitdirectory', '');
       input.onchange = (e) => {
-        const files = e.target.files;
-        console.log('[FS] Raw selected', files.length, 'files');
-        if (files.length > 0) {
-          const first = files[0];
-          const rel = first.webkitRelativePath || '';
-          const rootFolderName = rel.split('/')[0] || 'SFX Library';
-          const fileArray = Array.from(files);
-          
-          // Debug: log extensions
-          const exts = {};
-          fileArray.forEach(f => {
-            const ext = f.name.includes('.') ? f.name.split('.').pop().toLowerCase() : 'NO_EXT';
-            exts[ext] = (exts[ext] || 0) + 1;
-          });
-          console.log('[FS] Extensions found:', exts);
-          console.log('[FS] First 10 files:', fileArray.slice(0,10).map(f=>({name:f.name, type:f.type, size:f.size, rel:f.webkitRelativePath})));
-          
-          // INCLUDE ALL FILES - no filtering for debug
-          // Filter out only very small files (<100 bytes) and hidden files
-          const filtered = fileArray.filter(f => {
-            if (f.name.startsWith('.')) return false;
-            if (f.size < 100) return false;
-            // Exclude non-audio obvious files
-            const lower = f.name.toLowerCase();
-            if (lower.endsWith('.txt') || lower.endsWith('.json') || lower.endsWith('.html') || lower.endsWith('.htm') || lower.endsWith('.db') || lower.endsWith('.ini') || lower.endsWith('.exe') || lower.endsWith('.dll')) return false;
-            return true;
-          });
-          
-          console.log('[FS] After filtering small/system files:', filtered.length, 'of', fileArray.length);
-          
-          // If filtered is 0, include all >100 bytes
-          const finalFiles = filtered.length > 0 ? filtered : fileArray.filter(f => f.size > 100);
-          
-          console.log('[FS] Final files to include:', finalFiles.length);
-          
-          resolve({
-            path: rootFolderName,
-            name: rootFolderName,
-            token: null,
-            files: finalFiles,
-            allFilesCount: files.length,
-            audioCount: finalFiles.length,
-            extensions: exts
-          });
-        } else {
-          resolve(null);
-        }
-      };
-      input.style.display = 'none';
-      document.body.appendChild(input);
-      input.click();
-      setTimeout(()=>{ try{ document.body.removeChild(input); }catch(e){} }, 3000);
-    });
-  }
-
-  async scanFolderCEP(folderPath, depth = 0, maxDepth = 10) {
-    const results = [];
-    if (depth > maxDepth) return results;
-    try {
-      let fs = this.fs; let pathMod = this.path;
-      if (!fs) { try { if (window.require) fs = window.require('fs'); else if (window.cep_node) fs = window.cep_node.require('fs'); else fs = require('fs'); } catch(e) {} }
-      if (!pathMod) { try { if (window.require) pathMod = window.require('path'); else if (window.cep_node) pathMod = window.cep_node.require('path'); else pathMod = require('path'); } catch(e) {} }
-      if (!fs || !pathMod) return await this.scanFolderViaJSX(folderPath);
-      const entries = fs.readdirSync(folderPath);
-      for (const entry of entries) {
-        const fullPath = pathMod.join(folderPath, entry);
-        try {
-          const stat = fs.statSync(fullPath);
-          if (stat.isDirectory()) {
-            if (!entry.startsWith('.') && entry !== 'node_modules' && !entry.startsWith('__')) {
-              const sub = await this.scanFolderCEP(fullPath, depth + 1, maxDepth);
-              results.push(...sub);
-            }
-          } else if (stat.isFile()) {
-            // Include all files >100 bytes in CEP too
-            if (stat.size > 100) {
-              const ext = pathMod.extname(entry).toLowerCase() || '.wav';
-              results.push({
-                id: fullPath, path: fullPath, name: entry.replace(/\.[^/.]+$/, '') || entry,
-                fileName: entry, ext: ext, size: stat.size, folder: pathMod.dirname(fullPath),
-                folderName: this.getFolderNameFromPath(fullPath),
-                relativePath: fullPath.replace(folderPath, '').replace(/^[/\\]/, ''),
-                category: this.inferCategory(fullPath), fileObject: null
-              });
-            }
-          }
-        } catch (e) { console.warn('[FS] stat error', fullPath, e); }
-      }
-    } catch (e) { console.error('[FS] scan error', folderPath, e); }
-    return results;
-  }
-
-  getFolderNameFromPath(fullPath) {
-    try { const parts = fullPath.split(/[/\\]/); if (parts.length >= 2) return parts[parts.length - 2]; return 'Unknown'; } catch(e) { return 'Unknown'; }
-  }
-
-  async scanFolderViaJSX(folderPath) {
-    return new Promise(resolve => {
-      try {
-        const cs = new CSInterface();
-        const script = `
-          (function(){
-            var result = [];
-            var root = new Folder("${folderPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}");
-            if (!root.exists) return JSON.stringify([]);
-            function scan(folder, depth) {
-              if (depth > 10) return;
-              var files = folder.getFiles();
-              for (var i=0; i<files.length; i++) {
-                var f = files[i];
-                if (f instanceof Folder) { if (f.name.charAt(0) !== '.') scan(f, depth+1); }
-                else { if (f.length > 100) { result.push({ id: f.fsName, path: f.fsName, name: f.name.replace(/\\.[^/.]+$/, '') || f.name, fileName: f.name, ext: '.' + f.name.split('.').pop().toLowerCase(), size: f.length || 0, folder: f.parent.fsName, folderName: f.parent.name, relativePath: f.fsName.replace(root.fsName, '').replace(/^[/\\\\]/, ''), category: f.parent.name }); } }
-              }
-            }
-            scan(root, 0);
-            return JSON.stringify(result);
-          })()
-        `;
-        cs.evalScript(script, (res) => {
-          try { const parsed = JSON.parse(res); resolve(parsed.map(p => ({ ...p, category: this.inferCategory(p.path), ext: p.ext || '.wav' }))); }
-          catch (e) { console.error('[FS] JSX parse error', e, res); resolve([]); }
+        const files = Array.from(e.target.files || []);
+        console.log('[FS] Selected', files.length, 'files');
+        if (files.length === 0) { resolve(null); return; }
+        
+        const root = (files[0].webkitRelativePath || '').split('/')[0] || 'SFX';
+        // Keep ALL files, don't filter anything except hidden
+        const keep = files.filter(f => !f.name.startsWith('.') && f.size > 0);
+        console.log('[FS] Keeping', keep.length, 'files after removing hidden/empty');
+        console.log('[FS] Sample:', keep.slice(0,3).map(f=>f.name + ' | ' + f.type + ' | ' + f.webkitRelativePath));
+        
+        resolve({
+          path: root,
+          name: root,
+          files: keep,
+          total: files.length
         });
-      } catch (e) { console.error('[FS] JSX scan error', e); resolve([]); }
+      };
+      document.body.appendChild(input);
+      input.style.display = 'none';
+      input.click();
+      setTimeout(()=>{ try{document.body.removeChild(input)}catch(e){} }, 3000);
     });
   }
 
-  async scanFolderUXP(folderEntry, basePath = '') {
-    const results = [];
-    try {
-      const entries = await folderEntry.getEntries();
-      for (const entry of entries) {
-        if (entry.isFolder) { if (!entry.name.startsWith('.')) { const sub = await this.scanFolderUXP(entry, basePath + entry.name + '/'); results.push(...sub); } }
-        else if (entry.isFile) {
-          results.push({
-            id: entry.nativePath || (basePath + entry.name), path: entry.nativePath || (basePath + entry.name),
-            name: entry.name.replace(/\.[^/.]+$/, '') || entry.name, fileName: entry.name, ext: '.' + entry.name.split('.').pop().toLowerCase(),
-            size: 0, folder: basePath, folderName: basePath.split('/').filter(Boolean).pop() || entry.name,
-            relativePath: basePath + entry.name, category: this.inferCategory(basePath + entry.name), entry: entry
-          });
-        }
-      }
-    } catch (e) { console.error('[FS] UXP scan error', e); }
-    return results;
-  }
-
-  inferCategory(filePath) {
-    if (!filePath) return 'uncategorized';
-    const lower = filePath.toLowerCase();
-    const map = {
-      'bells': ['bell'], 'camera': ['camera'], 'cinematic & epic': ['cinematic', 'epic'],
-      'drone & ambient': ['drone', 'ambient'], 'elements & nature': ['elements', 'nature'],
-      'explosions': ['explosion'], 'glitch': ['glitch'], 'guns & weapons': ['gun', 'weapon'],
-      'hits & impacts': ['hits & impacts', 'hits', 'impact'], 'horror & tension': ['horror', 'tension'],
-      'melody & tonal': ['melody', 'tonal'], 'memes & funny': ['meme', 'funny'], 'risers': ['riser'],
-      'slow motion': ['slow motion'], 'sub drops': ['sub drop', 'sub drops', 'sub'],
-      'transitions': ['transition'], 'ui & clicks': ['ui & clicks', 'ui', 'click'],
-      'whoosh & swoosh': ['whoosh', 'swoosh', 'swish'], 'whoosh': ['whoosh', 'swoosh'],
-      'impact': ['impact', 'hit'], 'transition': ['transition'], 'riser': ['riser', 'build'],
-      'bass': ['bass'], 'ambient': ['ambient', 'drone'], 'miscellaneous': ['misc'],
-      'transition - vocal cadence': ['vocal', 'cadence']
-    };
-    for (const [cat, keys] of Object.entries(map)) { if (keys.some(k => lower.includes(k))) return cat; }
-    const parts = lower.split(/[/\\]/);
-    if (parts.length >= 2) {
-      const parent = parts[parts.length - 2];
-      if (parent && parent.length > 1 && !parent.includes('arranged')) return parent;
-    }
-    return 'uncategorized';
-  }
-
+  // Scan - SIMPLEST
   async scanFolders(folderList) {
-    let allFiles = [];
-    console.log('[FS] scanFolders start, folders:', folderList.length, folderList.map(f=>({name:f.name, files:f.files?.length, path:f.path})));
+    let all = [];
+    console.log('[FS] scanFolders', folderList.length, 'folders');
     
     for (const folder of folderList) {
       try {
-        if (folder.files) {
-          console.log('[FS] Browser folder', folder.name, 'files:', folder.files.length);
-          // Log extensions
-          const extCount = {};
-          folder.files.forEach(f => {
-            const ext = f.name.includes('.') ? f.name.split('.').pop().toLowerCase() : 'NO_EXT';
-            extCount[ext] = (extCount[ext]||0)+1;
-          });
-          console.log('[FS] Extensions in folder', folder.name, ':', extCount);
-          
-          const mapped = folder.files.map(f => {
+        if (folder.files && Array.isArray(folder.files)) {
+          // Browser files
+          console.log('[FS] Browser folder', folder.name, 'with', folder.files.length, 'files');
+          for (const f of folder.files) {
             try {
-              const relPath = f.webkitRelativePath || f.name;
-              const parts = relPath.split('/');
+              const rel = f.webkitRelativePath || f.name;
+              const parts = rel.split('/');
+              // Category = immediate parent folder
+              let cat = 'uncategorized';
               let folderName = folder.name;
               if (parts.length >= 2) {
-                const immediateParent = parts[parts.length - 2];
-                if (immediateParent && !immediateParent.toLowerCase().includes('arranged sfx')) folderName = immediateParent;
-                else if (parts.length >= 3) folderName = parts[1] || immediateParent;
+                const parent = parts[parts.length - 2];
+                if (parent && parent.toLowerCase() !== 'arranged sfx' && parent.toLowerCase() !== 'arranged_sfx' && parent !== folder.name) {
+                  folderName = parent;
+                  cat = parent.toLowerCase();
+                } else if (parts.length >= 3) {
+                  folderName = parts[parts.length - 2];
+                  cat = parts[1] ? parts[1].toLowerCase() : cat;
+                  // For Arranged sfx/Bells/file.wav -> cat = bells
+                  if (parts[0].toLowerCase().includes('arranged')) {
+                    cat = parts[1].toLowerCase();
+                    folderName = parts[1];
+                  }
+                }
               }
-              const nameWithoutExt = f.name.includes('.') ? f.name.replace(/\.[^/.]+$/, '') : f.name;
-              const ext = f.name.includes('.') ? '.' + f.name.split('.').pop().toLowerCase() : '.wav';
-              return {
-                id: relPath + '_' + f.size + '_' + f.name + '_' + Math.random().toString(36).slice(2,6),
-                path: relPath, name: nameWithoutExt, fileName: f.name, ext: ext, size: f.size,
-                folder: parts.slice(0, -1).join('/'), folderName: folderName, relativePath: relPath,
-                category: this.inferCategory(relPath), fileObject: f
-              };
+              
+              // Clean category - remove & and trim
+              cat = cat.replace(/[^a-z0-9 &_-]/g, '').trim() || 'uncategorized';
+              
+              all.push({
+                id: rel + '_' + f.size,
+                path: rel,
+                name: f.name.includes('.') ? f.name.substring(0, f.name.lastIndexOf('.')) : f.name,
+                fileName: f.name,
+                ext: f.name.includes('.') ? '.' + f.name.split('.').pop().toLowerCase() : '',
+                size: f.size,
+                folder: parts.slice(0,-1).join('/'),
+                folderName: folderName,
+                relativePath: rel,
+                category: cat,
+                fileObject: f
+              });
             } catch(err) {
-              console.error('[FS] Mapping error for file', f.name, err);
-              return null;
+              console.error('[FS] File map error', f.name, err);
             }
-          }).filter(Boolean);
-          
-          console.log('[FS] Mapped', mapped.length, 'files, first 2:', mapped.slice(0,2).map(m=>({name:m.name, ext:m.ext, cat:m.category})));
-          allFiles.push(...mapped);
-        } else if (folder.entry && folder.entry.getEntries) {
-          const files = await this.scanFolderUXP(folder.entry);
-          allFiles.push(...files);
-        } else {
-          const files = await this.scanFolderCEP(folder.path);
-          allFiles.push(...files);
+          }
+        } else if (folder.path) {
+          // CEP - Node fs
+          const files = await this.scanCEP(folder.path);
+          all.push(...files);
+        } else if (folder.entry) {
+          // UXP
+          const files = await this.scanUXP(folder.entry);
+          all.push(...files);
         }
-      } catch (e) { console.error('[FS] scan folder error', folder, e); }
+      } catch(e) { console.error('[FS] folder error', e); }
     }
     
-    const seen = new Set();
-    const deduped = [];
-    for (const f of allFiles) { if (!seen.has(f.id)) { seen.add(f.id); deduped.push(f); } }
-    
-    console.log('[FS] Final total', deduped.length, 'files');
-    if (deduped.length === 0 && allFiles.length > 0) {
-      console.error('[FS] Dedupe removed all! Original:', allFiles.length);
-      return allFiles; // return original if dedupe fails
-    }
-    return deduped;
+    console.log('[FS] Total mapped', all.length);
+    // Simple dedupe by path
+    const map = new Map();
+    all.forEach(f => { if (!map.has(f.path)) map.set(f.path, f); });
+    const result = Array.from(map.values());
+    console.log('[FS] After dedupe', result.length);
+    return result;
   }
 
-  getFileUrl(fileObj) {
-    if (fileObj.fileObject) return URL.createObjectURL(fileObj.fileObject);
-    if (fileObj.entry) return fileObj.path;
-    let p = fileObj.path;
-    if (!p.startsWith('file://') && !p.startsWith('blob:') && !p.startsWith('http')) p = 'file:///' + p.replace(/\\/g, '/').replace(/ /g, '%20');
-    return p;
+  async scanCEP(rootPath, depth=0) {
+    const out = [];
+    if (depth>10) return out;
+    try {
+      let fs = this.fs, path = this.path;
+      if (!fs) { try { fs = require('fs'); path = require('path'); } catch(e) { return await this.scanJSX(rootPath); } }
+      const entries = fs.readdirSync(rootPath);
+      for (const ent of entries) {
+        const full = path.join(rootPath, ent);
+        try {
+          const stat = fs.statSync(full);
+          if (stat.isDirectory()) {
+            if (!ent.startsWith('.')) {
+              const sub = await this.scanCEP(full, depth+1);
+              out.push(...sub);
+            }
+          } else {
+            if (stat.size > 100) {
+              out.push({
+                id: full, path: full,
+                name: ent.includes('.') ? ent.substring(0, ent.lastIndexOf('.')) : ent,
+                fileName: ent, ext: path.extname(ent).toLowerCase(),
+                size: stat.size, folder: path.dirname(full),
+                folderName: full.split(/[/\\]/).slice(-2,-1)[0] || 'Unknown',
+                relativePath: full.replace(rootPath,'').replace(/^[/\\]/,''),
+                category: this.simpleCategory(full), fileObject: null
+              });
+            }
+          }
+        } catch(e) {}
+      }
+    } catch(e) { console.error('[FS] CEP scan error', e); }
+    return out;
+  }
+
+  async scanJSX(rootPath) {
+    return new Promise(res => {
+      try {
+        const cs = new CSInterface();
+        const script = `(function(){var r=[];var root=new Folder("${rootPath.replace(/\\/g,'\\\\').replace(/"/g,'\\"')}");if(!root.exists)return JSON.stringify([]);function s(f,d){if(d>10)return;var fs=f.getFiles();for(var i=0;i<fs.length;i++){var file=fs[i];if(file instanceof Folder){if(file.name.charAt(0)!='.')s(file,d+1);}else{if(file.length>100)r.push({id:file.fsName,path:file.fsName,name:file.name,fileName:file.name,ext:'.'+file.name.split('.').pop().toLowerCase(),size:file.length,folder:file.parent.fsName,folderName:file.parent.name,relativePath:file.fsName.replace(root.fsName,'').replace(/^[/\\\\]/,''),category:file.parent.name});}}}s(root,0);return JSON.stringify(r);})()`;
+        cs.evalScript(script, result => {
+          try { const parsed = JSON.parse(result); res(parsed.map(p=>({...p, category: this.simpleCategory(p.path), name: p.name.includes('.')?p.name.substring(0,p.name.lastIndexOf('.')):p.name}))); }
+          catch(e) { res([]); }
+        });
+      } catch(e) { res([]); }
+    });
+  }
+
+  async scanUXP(entry, base='') {
+    const out=[];
+    try {
+      const entries = await entry.getEntries();
+      for (const e of entries) {
+        if (e.isFolder) { if (!e.name.startsWith('.')) { const sub=await this.scanUXP(e, base+e.name+'/'); out.push(...sub); } }
+        else { out.push({id:base+e.name, path:base+e.name, name:e.name.includes('.')?e.name.substring(0,e.name.lastIndexOf('.')):e.name, fileName:e.name, ext:'.'+e.name.split('.').pop().toLowerCase(), size:0, folder:base, folderName:base.split('/').filter(Boolean).pop()||e.name, relativePath:base+e.name, category:this.simpleCategory(base+e.name), entry:e}); }
+      }
+    } catch(e) {}
+    return out;
+  }
+
+  simpleCategory(path) {
+    if (!path) return 'uncategorized';
+    const low = path.toLowerCase();
+    // Direct folder name match for your 18 categories
+    const cats = ['bells','camera','cinematic & epic','drone & ambient','elements & nature','explosions','glitch','guns & weapons','hits & impacts','horror & tension','melody & tonal','memes & funny','miscellaneous','risers','slow motion','sub drops','transitions','ui & clicks','whoosh & swoosh'];
+    for (const c of cats) { if (low.includes(c)) return c; }
+    // Fallback to parent folder
+    const parts = low.split(/[/\\]/);
+    if (parts.length>=2) {
+      const parent = parts[parts.length-2];
+      if (parent && parent.length>1 && !parent.includes('arranged')) return parent;
+    }
+    return 'uncategorized';
   }
 }
 
