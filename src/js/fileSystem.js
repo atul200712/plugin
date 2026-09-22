@@ -72,10 +72,16 @@ class FileSystemManager {
         if (window.__adobe_cep__) {
           const cs = new CSInterface();
           cs.evalScript('Folder.selectDialog("Select your SFX Folder").fsName', (result) => {
-            if (result && result !== 'null' && result !== 'undefined' && result !== '') {
-              let clean = result.replace(/^['"]|['"]$/g, '');
-              if (clean && clean !== 'null') resolve(clean);
-              else resolve(null);
+            console.log('[FS] CEP dialog result:', result);
+            if (!result || result === 'null' || result === 'undefined' || result === '' || 
+                result.includes('EvalScript') || result.includes('error') || result.includes('Error')) {
+              console.warn('[FS] CEP dialog cancelled or error:', result);
+              resolve(null);
+              return;
+            }
+            let clean = result.replace(/^['"]|['"]$/g, '').trim();
+            if (clean && clean !== 'null' && clean.length > 2 && !clean.includes('EvalScript')) {
+              resolve(clean);
             } else {
               resolve(null);
             }
@@ -110,15 +116,27 @@ class FileSystemManager {
   }
 
   async selectFolder() {
+    // Try CEP first if available
     if (this.isCEP) {
       const path = await this.selectFolderCEP();
       if (path) {
         return { path: path, name: path.split(/[/\\]/).pop(), token: null };
       }
-      return null;
-    } else if (this.isUXP) {
-      return await this.selectFolderUXP();
-    } else {
+      // CEP cancelled or failed - don't return null yet, try browser fallback for preview
+      console.log('[FS] CEP folder selection cancelled, falling back to browser');
+    }
+    
+    if (this.isUXP) {
+      try {
+        const uxpFolder = await this.selectFolderUXP();
+        if (uxpFolder) return uxpFolder;
+      } catch(e) {
+        console.warn('[FS] UXP failed, falling back to browser', e);
+      }
+    }
+    
+    // Browser fallback (also used when CEP dialog cancelled in preview)
+    {
       // Browser - ULTRA PERMISSIVE
       return new Promise(resolve => {
         const input = document.createElement('input');
